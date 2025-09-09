@@ -7,7 +7,7 @@ import sys
 import sqlite3
 
 class DatabaseConnection:
-    def __init__(self, database_file="database.db"):
+    def __init__(self, database_file="lab1/database.db"):
         self.database_file = database_file
 
     def connect(self):
@@ -25,7 +25,7 @@ class MainWindow(QMainWindow):
         help_menu_item = self.menuBar().addMenu("&Help")
         edit_menu_item = self.menuBar().addMenu("&Edit")
 
-        add_student_action = QAction(QIcon("icons/add.png"), "Add Student", self)
+        add_student_action = QAction(QIcon("lab1/icons/add.png"), "Добавить студета", self)
         add_student_action.triggered.connect(self.insert)
         file_menu_item.addAction(add_student_action)
 
@@ -34,7 +34,7 @@ class MainWindow(QMainWindow):
         about_action.setMenuRole(QAction.MenuRole.NoRole)
         about_action.triggered.connect(self.about)
 
-        search_action = QAction(QIcon("icons/search.png"), "Search", self)
+        search_action = QAction(QIcon("lab1/icons/search.png"), "Search", self)
         edit_menu_item.addAction(search_action)
         search_action.triggered.connect(self.search)
 
@@ -104,7 +104,6 @@ class MainWindow(QMainWindow):
     def about(self):
         dialog = AboutDialog()
         dialog.exec()
-
 
 class AboutDialog(QMessageBox):
     def __init__(self):
@@ -210,11 +209,10 @@ class DeleteDialog(QDialog):
         confirmation_widget.setText("The record was deleted successfully!")
         confirmation_widget.exec()
 
-
 class InsertDialog(QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Insert Student Data")
+        self.setWindowTitle("Добавления данных студента")
         self.setFixedWidth(300)
         self.setFixedHeight(300)
 
@@ -222,7 +220,7 @@ class InsertDialog(QDialog):
 
         # Add student name widget
         self.student_name = QLineEdit()
-        self.student_name.setPlaceholderText("Name")
+        self.student_name.setPlaceholderText("Имя")
         layout.addWidget(self.student_name)
 
         # Add combo box of courses
@@ -233,11 +231,11 @@ class InsertDialog(QDialog):
 
         # Add mobile widget
         self.mobile = QLineEdit()
-        self.mobile.setPlaceholderText("Mobile")
+        self.mobile.setPlaceholderText("Телефон")
         layout.addWidget(self.mobile)
 
         # Add a submit button
-        button = QPushButton("Register")
+        button = QPushButton("Добавить")
         button.clicked.connect(self.add_student)
         layout.addWidget(button)
 
@@ -256,43 +254,58 @@ class InsertDialog(QDialog):
         connection.close()
         main_window.load_data()
 
-
 class SearchDialog(QDialog):
     def __init__(self):
         super().__init__()
-        # Set window title and size
-        self.setWindowTitle("Search Student")
+        self.setWindowTitle("Поиск студента")
         self.setFixedWidth(300)
         self.setFixedHeight(300)
 
-        # Create layout and input widget
         layout = QVBoxLayout()
         self.student_name = QLineEdit()
-        self.student_name.setPlaceholderText("Name")
+        self.student_name.setPlaceholderText("Имя или первая буква")
         layout.addWidget(self.student_name)
 
-        # Create button
-        button = QPushButton("Search")
+        button = QPushButton("Поиск")
         button.clicked.connect(self.search)
         layout.addWidget(button)
 
         self.setLayout(layout)
 
     def search(self):
-        name = self.student_name.text()
+        search_text = self.student_name.text().strip().lower()
+        
+        if not search_text:
+            QMessageBox.information(self, "Input Error", "Please enter a name or letter to search.")
+            return
+        
         connection = DatabaseConnection().connect()
         cursor = connection.cursor()
-        result = cursor.execute("SELECT * FROM students WHERE name = ?", (name,))
-        row = list(result)[0]
-        print(row)
-        items = main_window.table.findItems("John Smith", Qt.MatchFlag.MatchFixedString)
-        for item in items:
-            print(item)
-            main_window.table.item(item.row(), 1).setSelected(True)
-
+        
+        result = cursor.execute("SELECT * FROM students WHERE LOWER(name) LIKE ?", (f"{search_text}%",))
+        
+        rows = result.fetchall()
+        
+        if not rows:
+            QMessageBox.information(self, "Not Found", f"No student found starting with '{search_text}'.")
+            cursor.close()
+            connection.close()
+            return
+        
+        main_window.table.clearSelection()
+        found_count = 0
+        
+        for row_idx in range(main_window.table.rowCount()):
+            item = main_window.table.item(row_idx, 1) 
+            if item and item.text().lower().startswith(search_text):
+                found_count += 1
+                for col_idx in range(main_window.table.columnCount()):
+                    main_window.table.item(row_idx, col_idx).setSelected(True)
+                if found_count == 1:
+                    main_window.table.scrollToItem(item)
+        
         cursor.close()
         connection.close()
-
 
 app = QApplication(sys.argv)
 main_window = MainWindow()
